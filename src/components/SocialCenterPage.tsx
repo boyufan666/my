@@ -1,26 +1,40 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Page, UserProfile } from '../App';
-import { Sparkles, Play, Heart, Users, ChevronLeft, TrendingUp } from 'lucide-react';
+import { Sparkles, Play, Heart, Users, ChevronLeft, TrendingUp, MessageCircle, Send } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Progress } from './ui/progress';
 import { toast } from 'sonner@2.0.3';
+import { speakText } from '../lib/voice';
+import { sendChatMessage } from '../lib/api';
+import { Input } from './ui/input';
 
 interface SocialCenterPageProps {
   onNavigate: (page: Page) => void;
   userProfile: UserProfile;
 }
 
-const familyMessages = [
+// 家人成员配置（包含语音设置）
+const familyMembersConfig = [
+  { id: 1, name: '女儿小芳', avatar: '芳', relationship: '女儿', voiceType: 'young_female' },
+  { id: 2, name: '儿子小明', avatar: '明', relationship: '儿子', voiceType: 'young_male' },
+  { id: 3, name: '老伴', avatar: '伴', relationship: '配偶', voiceType: 'elder_female' },
+  { id: 4, name: '母亲', avatar: '母', relationship: '母亲', voiceType: 'elder_female' },
+  { id: 5, name: '朋友老王', avatar: '王', relationship: '朋友', voiceType: 'elder_male' },
+  { id: 6, name: '孙子小强', avatar: '强', relationship: '孙子', voiceType: 'child_male' },
+];
+
+const initialFamilyMessages = [
   {
     id: 1,
     sender: '女儿小芳',
     avatar: '芳',
     message: '爸爸，您今天做得真棒！继续加油！',
     type: 'text' as const,
-    time: '今天上午'
+    time: '今天上午',
+    memberId: 1
   },
   {
     id: 2,
@@ -28,7 +42,8 @@ const familyMessages = [
     avatar: '明',
     message: '爸爸加油，我们都为你骄傲！',
     type: 'voice' as const,
-    time: '昨天'
+    time: '昨天',
+    memberId: 2
   },
   {
     id: 3,
@@ -36,7 +51,8 @@ const familyMessages = [
     avatar: '伴',
     message: '今天的太极拳做得很好呢，晚上给你做你最爱吃的菜！',
     type: 'text' as const,
-    time: '2天前'
+    time: '2天前',
+    memberId: 3
   }
 ];
 
@@ -48,11 +64,17 @@ const achievements = [
 
 export function SocialCenterPage({ onNavigate, userProfile }: SocialCenterPageProps) {
   const [playingMessage, setPlayingMessage] = useState<number | null>(null);
-  const [familyMembers] = useState([
-    { id: 1, name: '女儿小芳', avatar: '芳', relationship: '女儿', lastActive: '2小时前' },
-    { id: 2, name: '儿子小明', avatar: '明', relationship: '儿子', lastActive: '5小时前' },
-    { id: 3, name: '老伴', avatar: '伴', relationship: '配偶', lastActive: '刚刚' },
-  ]);
+  const [familyMessages, setFamilyMessages] = useState(initialFamilyMessages);
+  const [familyMembers] = useState(
+    familyMembersConfig.map(member => ({
+      ...member,
+      lastActive: member.id === 3 ? '刚刚' : `${Math.floor(Math.random() * 5) + 1}小时前`
+    }))
+  );
+  const [selectedMember, setSelectedMember] = useState<number | null>(null);
+  const [messageInput, setMessageInput] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'family'; content: string; time: string }>>([]);
   const [weeklyProgress] = useState({
     days: 7,
     totalMinutes: 245,
@@ -61,9 +83,34 @@ export function SocialCenterPage({ onNavigate, userProfile }: SocialCenterPagePr
   });
 
   const handlePlayVoice = (messageId: number) => {
-    setPlayingMessage(messageId);
-    toast.success('正在播放语音留言...');
-    setTimeout(() => setPlayingMessage(null), 3000);
+    const message = familyMessages.find(m => m.id === messageId);
+    if (message) {
+      setPlayingMessage(messageId);
+      // 播放语音留言（使用对应家人的声音类型）
+      const member = familyMembersConfig.find(m => m.id === message.memberId);
+      const voiceOptions = getVoiceOptionsForMember(member?.voiceType || 'elder_female');
+      speakText(message.message, () => {
+        setPlayingMessage(null);
+      }, voiceOptions);
+    }
+  };
+
+  // 根据家人类型获取语音参数
+  const getVoiceOptionsForMember = (voiceType: string) => {
+    switch (voiceType) {
+      case 'young_female': // 年轻女性（女儿）
+        return { rate: 1.0, pitch: 1.2, volume: 0.9 };
+      case 'young_male': // 年轻男性（儿子）
+        return { rate: 1.0, pitch: 0.9, volume: 0.9 };
+      case 'elder_female': // 年长女性（老伴、母亲）
+        return { rate: 0.85, pitch: 1.0, volume: 0.9 };
+      case 'elder_male': // 年长男性（朋友）
+        return { rate: 0.85, pitch: 0.85, volume: 0.9 };
+      case 'child_male': // 儿童（孙子）
+        return { rate: 1.1, pitch: 1.3, volume: 0.9 };
+      default:
+        return { rate: 0.9, pitch: 1.1, volume: 0.9 };
+    }
   };
 
   const handleShareAchievement = (achievementName: string) => {
@@ -72,10 +119,67 @@ export function SocialCenterPage({ onNavigate, userProfile }: SocialCenterPagePr
     });
   };
 
-  const handleSendMessage = (memberId: number) => {
-    toast.info('正在打开聊天...', {
-      description: '与家人开始对话'
-    });
+  const handleSendMessage = async (memberId: number) => {
+    setSelectedMember(memberId);
+    const member = familyMembersConfig.find(m => m.id === memberId);
+    if (member) {
+      // 播放欢迎语音
+      const welcomeText = `正在与${member.name}开始对话`;
+      speakText(welcomeText, undefined, getVoiceOptionsForMember(member.voiceType));
+      toast.info(`正在与${member.name}聊天...`);
+    }
+  };
+
+  // 发送消息给家人（使用AI生成回复）
+  const handleSendMessageToFamily = async () => {
+    if (!selectedMember || !messageInput.trim()) return;
+
+    const member = familyMembersConfig.find(m => m.id === selectedMember);
+    if (!member) return;
+
+    setIsSending(true);
+    const userMessage = messageInput.trim();
+    setMessageInput('');
+
+    // 添加用户消息到聊天记录
+    const newUserMessage = {
+      role: 'user' as const,
+      content: userMessage,
+      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    };
+    setChatMessages(prev => [...prev, newUserMessage]);
+
+    try {
+      // 使用星火大模型生成人性化回复
+      const prompt = `你正在扮演${member.name}（${member.relationship}），用户给你发了一条消息："${userMessage}"。请以${member.name}的身份，用温暖、亲切、人性化的语气回复这条消息。回复要简短自然，就像真正的家人之间的对话一样。只回复内容，不要添加其他说明。`;
+      
+      const response = await sendChatMessage(prompt, `family_${selectedMember}`, false, -1);
+      
+      if (response.success) {
+        const aiReply = response.data.reply;
+        
+        // 添加家人回复到聊天记录
+        const newFamilyMessage = {
+          role: 'family' as const,
+          content: aiReply,
+          time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+        };
+        setChatMessages(prev => [...prev, newFamilyMessage]);
+
+        // 播放家人回复的语音
+        const voiceOptions = getVoiceOptionsForMember(member.voiceType);
+        speakText(aiReply, undefined, voiceOptions);
+
+        toast.success(`${member.name}已回复`);
+      } else {
+        throw new Error('AI回复失败');
+      }
+    } catch (error) {
+      console.error('发送消息失败:', error);
+      toast.error('发送消息失败，请重试');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
@@ -357,6 +461,110 @@ export function SocialCenterPage({ onNavigate, userProfile }: SocialCenterPagePr
               </CardContent>
             </Card>
           </motion.div>
+
+          {/* 聊天对话框 */}
+          {selectedMember && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="fixed inset-0 bg-black/50 flex items-end z-50"
+              onClick={() => setSelectedMember(null)}
+            >
+              <motion.div
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                className="w-full bg-white rounded-t-3xl p-6 max-h-[80vh] flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    {(() => {
+                      const member = familyMembersConfig.find(m => m.id === selectedMember);
+                      return member ? (
+                        <>
+                          <Avatar className="w-12 h-12">
+                            <AvatarFallback className="bg-purple-400 text-white">
+                              {member.avatar}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-semibold text-gray-800">{member.name}</p>
+                            <p className="text-xs text-gray-500">{member.relationship}</p>
+                          </div>
+                        </>
+                      ) : null;
+                    })()}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedMember(null)}
+                  >
+                    关闭
+                  </Button>
+                </div>
+
+                {/* 聊天消息列表 */}
+                <div className="flex-1 overflow-y-auto space-y-3 mb-4 min-h-[200px]">
+                  {chatMessages.length === 0 ? (
+                    <div className="text-center text-gray-500 py-8">
+                      <p>开始与家人对话吧！</p>
+                    </div>
+                  ) : (
+                    chatMessages.map((msg, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div
+                          className={`max-w-[75%] rounded-2xl p-3 ${
+                            msg.role === 'user'
+                              ? 'bg-purple-500 text-white rounded-br-none'
+                              : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                          }`}
+                        >
+                          <p className="text-sm">{msg.content}</p>
+                          <p className={`text-xs mt-1 ${msg.role === 'user' ? 'text-purple-100' : 'text-gray-500'}`}>
+                            {msg.time}
+                          </p>
+                        </div>
+                      </motion.div>
+                    ))
+                  )}
+                </div>
+
+                {/* 输入框 */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    placeholder="输入消息..."
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !isSending && messageInput.trim()) {
+                        handleSendMessageToFamily();
+                      }
+                    }}
+                    disabled={isSending}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100"
+                  />
+                  <Button
+                    onClick={handleSendMessageToFamily}
+                    disabled={isSending || !messageInput.trim()}
+                    className="bg-purple-500 hover:bg-purple-600"
+                  >
+                    {isSending ? (
+                      '发送中...'
+                    ) : (
+                      <Send size={20} />
+                    )}
+                  </Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
         </div>
       </div>
     </div>

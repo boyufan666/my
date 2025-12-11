@@ -6,6 +6,7 @@ interface GardenGameProps {
   onScoreChange: (score: number) => void;
   onComplete: (result: GameResult) => void;
   motionData?: { type: string; intensity: number; position: { x: number; y: number } } | null;
+  poseData?: any;
 }
 
 interface Plant {
@@ -25,7 +26,7 @@ const plantTypes = [
   { name: '郁金香', emoji: '🌷' }
 ];
 
-export function GardenGame({ onScoreChange, onComplete, motionData }: GardenGameProps) {
+export function GardenGame({ onScoreChange, onComplete, motionData, poseData }: GardenGameProps) {
   const [plants, setPlants] = useState<Plant[]>([]);
   const [selectedTool, setSelectedTool] = useState<'water' | 'sun'>('water');
   const [score, setScore] = useState(0);

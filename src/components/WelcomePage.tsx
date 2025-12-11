@@ -2,12 +2,26 @@ import { motion } from 'motion/react';
 import { Settings, HelpCircle } from 'lucide-react';
 import { VoiceAssistant } from './VoiceAssistant';
 import { Page } from '../App';
+import { speakText } from '../lib/voice';
+import { useEffect } from 'react';
 
 interface WelcomePageProps {
   onNavigate: (page: Page) => void;
 }
 
 export function WelcomePage({ onNavigate }: WelcomePageProps) {
+  // 进入页面时自动播放欢迎语音
+  useEffect(() => {
+    // 延迟一点播放，确保页面加载完成
+    const timer = setTimeout(() => {
+      speakText('你好，欢迎使用AI康复平台', () => {
+        console.log('✅ 欢迎语音播放完成');
+      });
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-between p-8 max-w-2xl mx-auto">
       {/* Top - Logo and Name */}

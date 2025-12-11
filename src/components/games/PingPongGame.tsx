@@ -1,17 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { GameResult } from '../../App';
+import { PoseResult } from '../../lib/poseDetection';
 
 interface PingPongGameProps {
   onScoreChange: (score: number) => void;
   onComplete: (result: GameResult) => void;
   motionData?: { type: string; intensity: number; position: { x: number; y: number } } | null;
+  poseData?: PoseResult | null;
 }
 
-export function PingPongGame({ onScoreChange, onComplete, motionData }: PingPongGameProps) {
+export function PingPongGame({ onScoreChange, onComplete, motionData, poseData }: PingPongGameProps) {
   const [score, setScore] = useState(0);
   const [ballPosition, setBallPosition] = useState({ x: 50, y: 50 });
-  const [paddlePosition, setPaddlePosition] = useState(80);
+  const [leftPaddlePosition, setLeftPaddlePosition] = useState(50); // 左手球拍
+  const [rightPaddlePosition, setRightPaddlePosition] = useState(50); // 右手球拍
   const [showHitEffect, setShowHitEffect] = useState(false);
   const gameRef = useRef<HTMLDivElement>(null);
   
@@ -19,7 +22,8 @@ export function PingPongGame({ onScoreChange, onComplete, motionData }: PingPong
   const ballVelocityRef = useRef({ x: 2, y: 2 });
   const gameCompletedRef = useRef(false);
   const scoreRef = useRef(0);
-  const paddleRef = useRef(80);
+  const leftPaddleRef = useRef(50);
+  const rightPaddleRef = useRef(50);
 
   // Update refs when state changes
   useEffect(() => {
@@ -27,8 +31,12 @@ export function PingPongGame({ onScoreChange, onComplete, motionData }: PingPong
   }, [score]);
 
   useEffect(() => {
-    paddleRef.current = paddlePosition;
-  }, [paddlePosition]);
+    leftPaddleRef.current = leftPaddlePosition;
+  }, [leftPaddlePosition]);
+
+  useEffect(() => {
+    rightPaddleRef.current = rightPaddlePosition;
+  }, [rightPaddlePosition]);
 
   // Update parent with score changes
   useEffect(() => {
@@ -73,14 +81,22 @@ export function PingPongGame({ onScoreChange, onComplete, motionData }: PingPong
           newY = 0;
         }
 
-        // Paddle collision
-        if (newY >= paddleRef.current - 5 && newY <= paddleRef.current + 5) {
-          if (Math.abs(newX - 50) < 15) {
-            newVelY = -Math.abs(newVelY);
-            setScore(prev => prev + 1);
-            setShowHitEffect(true);
-            setTimeout(() => setShowHitEffect(false), 200);
-          }
+        // Paddle collision - 检查左右球拍
+        // 左球拍碰撞（在左侧）
+        if (newX < 30 && newY >= leftPaddleRef.current - 5 && newY <= leftPaddleRef.current + 5) {
+          newVelX = Math.abs(newVelX);
+          newVelY = -Math.abs(newVelY);
+          setScore(prev => prev + 1);
+          setShowHitEffect(true);
+          setTimeout(() => setShowHitEffect(false), 200);
+        }
+        // 右球拍碰撞（在右侧）
+        if (newX > 70 && newY >= rightPaddleRef.current - 5 && newY <= rightPaddleRef.current + 5) {
+          newVelX = -Math.abs(newVelX);
+          newVelY = -Math.abs(newVelY);
+          setScore(prev => prev + 1);
+          setShowHitEffect(true);
+          setTimeout(() => setShowHitEffect(false), 200);
         }
 
         // Ball out of bounds
@@ -100,12 +116,30 @@ export function PingPongGame({ onScoreChange, onComplete, motionData }: PingPong
   }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (gameRef.current) {
+    if (gameRef.current && !poseData) {
       const rect = gameRef.current.getBoundingClientRect();
       const y = ((e.clientY - rect.top) / rect.height) * 100;
-      setPaddlePosition(Math.max(10, Math.min(90, y)));
+      setLeftPaddlePosition(Math.max(10, Math.min(90, y)));
+      setRightPaddlePosition(Math.max(10, Math.min(90, y)));
     }
-  }, []);
+  }, [poseData]);
+
+  // 体感控制：通过双手移动球拍
+  useEffect(() => {
+    if (poseData) {
+      // 左手控制左球拍
+      if (poseData.leftWrist && poseData.leftWrist.visibility && poseData.leftWrist.visibility > 0.5) {
+        const newPosition = 10 + (poseData.leftWrist.y * 80);
+        setLeftPaddlePosition(Math.max(10, Math.min(90, newPosition)));
+      }
+      
+      // 右手控制右球拍
+      if (poseData.rightWrist && poseData.rightWrist.visibility && poseData.rightWrist.visibility > 0.5) {
+        const newPosition = 10 + (poseData.rightWrist.y * 80);
+        setRightPaddlePosition(Math.max(10, Math.min(90, newPosition)));
+      }
+    }
+  }, [poseData]);
 
   return (
     <div
@@ -131,24 +165,73 @@ export function PingPongGame({ onScoreChange, onComplete, motionData }: PingPong
         transition={{ duration: 0.2 }}
       />
 
-      {/* Paddle */}
-      <div
-        className="absolute right-12 w-4 h-24 bg-red-500 rounded-lg shadow-lg"
-        style={{
-          top: `${paddlePosition}%`,
-          transform: 'translateY(-50%)'
-        }}
-      />
-
-      {/* Opponent Paddle (AI) */}
+      {/* 左手球拍（左侧） */}
       <motion.div
-        className="absolute left-12 w-4 h-24 bg-blue-500 rounded-lg shadow-lg"
+        className="absolute left-12 w-4 h-24 bg-blue-500 rounded-lg shadow-lg z-10"
+        style={{
+          top: `${leftPaddlePosition}%`,
+          transform: 'translateY(-50%)',
+        }}
         animate={{
-          top: `${ballPosition.y}%`
+          scale: poseData?.leftWrist ? [1, 1.1, 1] : 1,
         }}
         transition={{ duration: 0.3 }}
-        style={{ transform: 'translateY(-50%)' }}
-      />
+      >
+        {/* 球拍手柄 */}
+        <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-2 h-8 bg-blue-600 rounded" />
+      </motion.div>
+
+      {/* 右手球拍（右侧） */}
+      <motion.div
+        className="absolute right-12 w-4 h-24 bg-red-500 rounded-lg shadow-lg z-10"
+        style={{
+          top: `${rightPaddlePosition}%`,
+          transform: 'translateY(-50%)',
+        }}
+        animate={{
+          scale: poseData?.rightWrist ? [1, 1.1, 1] : 1,
+        }}
+        transition={{ duration: 0.3 }}
+      >
+        {/* 球拍手柄 */}
+        <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-2 h-8 bg-red-600 rounded" />
+      </motion.div>
+
+      {/* 双手位置指示器 */}
+      {poseData?.leftWrist && poseData.leftWrist.visibility && poseData.leftWrist.visibility > 0.5 && (
+        <motion.div
+          className="absolute w-8 h-8 rounded-full bg-blue-400 border-2 border-white shadow-lg z-20"
+          style={{
+            left: `${poseData.leftWrist.x * 100}%`,
+            top: `${poseData.leftWrist.y * 100}%`,
+            transform: 'translate(-50%, -50%)',
+          }}
+          animate={{
+            scale: [1, 1.2, 1],
+          }}
+          transition={{
+            duration: 0.5,
+            repeat: Infinity,
+          }}
+        />
+      )}
+      {poseData?.rightWrist && poseData.rightWrist.visibility && poseData.rightWrist.visibility > 0.5 && (
+        <motion.div
+          className="absolute w-8 h-8 rounded-full bg-red-400 border-2 border-white shadow-lg z-20"
+          style={{
+            left: `${poseData.rightWrist.x * 100}%`,
+            top: `${poseData.rightWrist.y * 100}%`,
+            transform: 'translate(-50%, -50%)',
+          }}
+          animate={{
+            scale: [1, 1.2, 1],
+          }}
+          transition={{
+            duration: 0.5,
+            repeat: Infinity,
+          }}
+        />
+      )}
 
       {/* Score Display */}
       <div className="absolute top-24 left-1/2 -translate-x-1/2 text-white text-6xl font-bold opacity-20">
@@ -156,19 +239,39 @@ export function PingPongGame({ onScoreChange, onComplete, motionData }: PingPong
       </div>
 
       {/* Gesture Hint */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/50 text-center">
-        <motion.div
-          animate={{
-            y: [0, -10, 0]
-          }}
-          transition={{
-            duration: 1.5,
-            repeat: Infinity
-          }}
-        >
-          ✋
-        </motion.div>
-        <p className="text-sm mt-2">移动鼠标控制球拍</p>
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/80 text-center">
+        {poseData ? (
+          <>
+            <motion.div
+              animate={{
+                y: [0, -10, 0]
+              }}
+              transition={{
+                duration: 1.5,
+                repeat: Infinity
+              }}
+            >
+              ✋✋
+            </motion.div>
+            <p className="text-sm mt-2 font-semibold">用双手控制球拍！</p>
+            <p className="text-xs mt-1 opacity-70">左手控制左球拍，右手控制右球拍</p>
+          </>
+        ) : (
+          <>
+            <motion.div
+              animate={{
+                y: [0, -10, 0]
+              }}
+              transition={{
+                duration: 1.5,
+                repeat: Infinity
+              }}
+            >
+              ✋
+            </motion.div>
+            <p className="text-sm mt-2">移动鼠标控制球拍</p>
+          </>
+        )}
       </div>
 
       {/* Hit Effect */}

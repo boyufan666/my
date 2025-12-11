@@ -5,7 +5,8 @@ import { Page, UserProfile } from '../App';
 import { 
   User, Users, Wifi, Volume2, Monitor, MessageCircle, Trophy, 
   Lock, Key, FileText, BookOpen, MessageSquare, Phone, LogOut, 
-  ChevronRight, ChevronLeft, Mic, Camera, CheckCircle, XCircle
+  ChevronRight, ChevronLeft, Mic, Camera, CheckCircle, XCircle,
+  ShoppingBag, Coins
 } from 'lucide-react';
 import { Switch } from './ui/switch';
 import { Button } from './ui/button';
@@ -16,7 +17,7 @@ interface SettingsPageProps {
   userProfile: UserProfile;
 }
 
-export function SettingsPage({ onNavigate, userProfile }: SettingsPageProps) {
+export function SettingsPage({ onNavigate, userProfile, onUpdateProfile }: SettingsPageProps) {
   const [micPermission, setMicPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt');
   const [cameraPermission, setCameraPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt');
   const [voiceEnabled, setVoiceEnabled] = useState(true);
@@ -69,15 +70,23 @@ export function SettingsPage({ onNavigate, userProfile }: SettingsPageProps) {
   };
 
   const accountSettings = [
-    { icon: User, label: '编辑个人信息', hasAnimation: true },
-    { icon: Users, label: '管理家庭成员', hasAnimation: true },
-    { icon: Wifi, label: '体感设备连接', hasAnimation: true, status: '未连接' },
+    { icon: User, label: '编辑个人信息', hasAnimation: true, onClick: () => onNavigate('profile') },
+    { icon: Users, label: '管理家庭成员', hasAnimation: true, onClick: () => {
+      toast.info('家庭成员管理功能开发中', { description: '您可以在这里添加和管理家庭成员' });
+    }},
+    { icon: Wifi, label: '体感设备连接', hasAnimation: true, status: '未连接', onClick: () => {
+      toast.info('体感设备连接', { description: '请确保设备已开启并处于配对模式' });
+    }},
   ];
 
   const personalSettings = [
     { icon: MessageCircle, label: '重新进行评估', hasAnimation: true, onClick: () => onNavigate('assessment-guide') },
-    { icon: Volume2, label: '提示音与语音', hasAnimation: true },
-    { icon: Monitor, label: '显示设置', hasAnimation: true },
+    { icon: Volume2, label: '提示音与语音', hasAnimation: true, onClick: () => {
+      toast.info('提示音与语音设置', { description: '语音功能：' + (voiceEnabled ? '已开启' : '已关闭') });
+    }},
+    { icon: Monitor, label: '显示设置', hasAnimation: true, onClick: () => {
+      toast.info('显示设置', { description: '您可以调整字体大小、主题颜色等' });
+    }},
   ];
 
   const socialSettings = [
@@ -86,16 +95,56 @@ export function SettingsPage({ onNavigate, userProfile }: SettingsPageProps) {
   ];
 
   const securitySettings = [
-    { icon: Lock, label: '隐私设置', hasAnimation: true },
-    { icon: Key, label: '修改密码', hasAnimation: true },
-    { icon: FileText, label: '用户协议与隐私政策', hasAnimation: true },
+    { icon: Lock, label: '隐私设置', hasAnimation: true, onClick: () => {
+      toast.info('隐私设置', { description: '您可以管理数据分享、位置权限等隐私选项' });
+    }},
+    { icon: Key, label: '修改密码', hasAnimation: true, onClick: () => {
+      toast.info('修改密码', { description: '密码修改功能开发中，请联系客服' });
+    }},
+    { icon: FileText, label: '用户协议与隐私政策', hasAnimation: true, onClick: () => {
+      toast.info('用户协议与隐私政策', { description: '请访问我们的官方网站查看完整的用户协议和隐私政策' });
+    }},
   ];
 
   const helpSettings = [
     { icon: BookOpen, label: '使用指南', hasAnimation: true, onClick: () => onNavigate('help') },
-    { icon: MessageSquare, label: '意见反馈', hasAnimation: true },
-    { icon: Phone, label: '联系客服', hasAnimation: true, status: '24h在线' },
+    { icon: MessageSquare, label: '意见反馈', hasAnimation: true, onClick: () => {
+      toast.info('意见反馈', { description: '感谢您的反馈！我们会认真考虑您的建议' });
+    }},
+    { icon: Phone, label: '联系客服', hasAnimation: true, status: '24h在线', onClick: () => {
+      toast.info('联系客服', { description: '客服电话：400-123-4567，工作时间：24小时在线' });
+    }},
   ];
+
+  const shopItems = [
+    { id: 'robot', name: '扫地机器人', price: 5000, emoji: '🤖', description: '智能扫地机器人，解放双手' },
+    { id: 'tv', name: '电视', price: 3000, emoji: '📺', description: '55寸智能电视' },
+    { id: 'computer', name: '电脑', price: 4000, emoji: '💻', description: '高性能电脑' },
+    { id: 'mouse', name: '鼠标', price: 200, emoji: '🖱️', description: '无线鼠标' },
+    { id: 'motion', name: '体感识别装置', price: 2000, emoji: '📹', description: '专业体感识别设备' },
+  ];
+
+  const handlePurchase = (item: typeof shopItems[0]) => {
+    const currentCoins = userProfile.gameCoins || 0;
+    if (currentCoins < item.price) {
+      toast.error('游戏币不足！', { description: `需要 ${item.price} 游戏币，当前有 ${currentCoins}` });
+      return;
+    }
+
+    const ownedItems = userProfile.ownedItems || [];
+    if (ownedItems.includes(item.id)) {
+      toast.warning('您已拥有此物品');
+      return;
+    }
+
+    if (onUpdateProfile) {
+      onUpdateProfile({
+        gameCoins: currentCoins - item.price,
+        ownedItems: [...ownedItems, item.id]
+      });
+      toast.success('购买成功！', { description: `已购买 ${item.name}` });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
@@ -255,6 +304,66 @@ export function SettingsPage({ onNavigate, userProfile }: SettingsPageProps) {
             items={securitySettings}
             variant="security"
           />
+
+          {/* Shop */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-3xl p-4 border-2 border-yellow-200"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <ShoppingBag className="text-yellow-600" size={24} />
+              <h3 className="text-yellow-900 font-bold text-lg">游戏商店</h3>
+            </div>
+            <div className="mb-4 bg-white rounded-xl p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Coins className="text-yellow-600" size={20} />
+                <span className="text-gray-800 font-semibold">游戏币</span>
+              </div>
+              <span className="text-2xl font-bold text-yellow-600">{userProfile.gameCoins || 0}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {shopItems.map((item) => {
+                const owned = (userProfile.ownedItems || []).includes(item.id);
+                const canAfford = (userProfile.gameCoins || 0) >= item.price;
+                
+                return (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className={`bg-white rounded-xl p-4 border-2 ${
+                      owned ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                    }`}
+                  >
+                    <div className="text-4xl mb-2 text-center">{item.emoji}</div>
+                    <div className="text-sm font-semibold text-gray-800 mb-1 text-center">{item.name}</div>
+                    <div className="text-xs text-gray-600 mb-2 text-center">{item.description}</div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-yellow-600 font-bold">💰 {item.price}</span>
+                      {owned && (
+                        <span className="text-xs text-green-600 font-semibold">✓ 已拥有</span>
+                      )}
+                    </div>
+                    <Button
+                      onClick={() => handlePurchase(item)}
+                      disabled={owned || !canAfford}
+                      className={`w-full text-xs ${
+                        owned
+                          ? 'bg-green-500 text-white'
+                          : canAfford
+                          ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                          : 'bg-gray-300 text-gray-500'
+                      }`}
+                      size="sm"
+                    >
+                      {owned ? '已拥有' : canAfford ? '购买' : '游戏币不足'}
+                    </Button>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
 
           {/* Help & Feedback */}
           <SettingsSection 

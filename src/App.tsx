@@ -1,4 +1,5 @@
 import { useState, lazy, Suspense } from 'react';
+import { ErrorBoundary } from './components/ErrorBoundary';
 const WelcomePage = lazy(() => import('./components/WelcomePage').then(m => ({ default: m.WelcomePage })));
 const AssessmentGuidePage = lazy(() => import('./components/AssessmentGuidePage').then(m => ({ default: m.AssessmentGuidePage })));
 const AIAssessmentPage = lazy(() => import('./components/AIAssessmentPage').then(m => ({ default: m.AIAssessmentPage })));
@@ -43,6 +44,8 @@ export interface UserProfile {
   assessmentScore: number;
   level: number;
   todayProgress: number;
+  gameCoins?: number; // 游戏币
+  ownedItems?: string[]; // 拥有的物品
 }
 
 export interface GameResult {
@@ -63,7 +66,9 @@ export default function App() {
     physicalCondition: [],
     assessmentScore: 0,
     level: 11,
-    todayProgress: 80
+    todayProgress: 80,
+    gameCoins: 1000,
+    ownedItems: []
   });
 
   const navigateTo = (page: Page, gameId?: string) => {
@@ -77,8 +82,12 @@ export default function App() {
     setUserProfile(prev => ({ ...prev, ...updates }));
   };
 
-  const handleGameComplete = (result: GameResult) => {
+  const handleGameComplete = (result: GameResult & { gameCoins?: number }) => {
     setGameResult(result);
+    // 更新游戏币
+    if (result.gameCoins !== undefined) {
+      updateUserProfile({ gameCoins: result.gameCoins });
+    }
     navigateTo('game-result');
   };
 
@@ -94,13 +103,17 @@ export default function App() {
         {currentPage === 'game-library' && <GameLibraryPage onNavigate={navigateTo} userProfile={userProfile} />}
         {currentPage === 'data-center' && <DataCenterPage onNavigate={navigateTo} userProfile={userProfile} />}
         {currentPage === 'profile' && <ProfilePage onNavigate={navigateTo} userProfile={userProfile} />}
-        {currentPage === 'settings' && <SettingsPage onNavigate={navigateTo} userProfile={userProfile} />}
+        {currentPage === 'settings' && <SettingsPage onNavigate={navigateTo} userProfile={userProfile} onUpdateProfile={updateUserProfile} />}
         {currentPage === 'social-center' && <SocialCenterPage onNavigate={navigateTo} userProfile={userProfile} />}
         {currentPage === 'help' && <HelpPage onNavigate={navigateTo} />}
         {currentPage === 'send-encouragement' && <SendEncouragementPage onNavigate={navigateTo} />}
         {currentPage === 'coloring' && <ColoringPage onNavigate={navigateTo} />}
         {currentPage === 'game-detail' && selectedGameId && <GameDetailPage gameId={selectedGameId} onNavigate={navigateTo} />}
-        {currentPage === 'game-play' && selectedGameId && <GamePlayPage gameId={selectedGameId} onNavigate={navigateTo} onGameComplete={handleGameComplete} />}
+        {currentPage === 'game-play' && selectedGameId && (
+          <ErrorBoundary>
+            <GamePlayPage gameId={selectedGameId} onNavigate={navigateTo} onGameComplete={handleGameComplete} />
+          </ErrorBoundary>
+        )}
         {currentPage === 'game-result' && gameResult && <GameResultPage result={gameResult} onNavigate={navigateTo} gameId={selectedGameId} />}
         </Suspense>
       </div>

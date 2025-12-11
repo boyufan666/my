@@ -206,6 +206,7 @@ const questions: Question[] = [
 
 export function AIAssessmentPage({ onNavigate, onUpdateProfile }: AIAssessmentPageProps) {
   const [assessmentScore, setAssessmentScore] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   const handleMMSEComplete = (score: number) => {
     setAssessmentScore(score);
@@ -223,7 +224,20 @@ export function AIAssessmentPage({ onNavigate, onUpdateProfile }: AIAssessmentPa
         <p className="text-center text-sm text-gray-600 mt-2">
           请通过语音回答小忆的问题
         </p>
+        <p className="text-center text-xs text-yellow-600 mt-2">
+          ⚠️ 首次使用需要允许麦克风权限
+        </p>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-4 bg-red-50 border-2 border-red-200 rounded-2xl p-4 text-center">
+          <p className="text-red-800 font-semibold">{error}</p>
+          <p className="text-sm text-red-600 mt-2">
+            请检查：1. 麦克风权限是否已授予 2. 网络连接是否正常 3. 服务器是否运行
+          </p>
+        </div>
+      )}
 
       {/* Voice Assistant in MMSE Mode */}
       <div className="flex-1 flex flex-col items-center justify-center">

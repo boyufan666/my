@@ -59,5 +59,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
     server: {
       port: 3000,
       open: true,
+      proxy: {
+        // 代理所有 /api 请求到后端服务器
+        '/api': {
+          target: 'http://localhost:5000',
+          changeOrigin: true,
+          secure: false,
+        },
+      },
     },
   });

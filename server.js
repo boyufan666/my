@@ -6,9 +6,28 @@ const crypto = require('crypto');
 const { URL, URLSearchParams } = require('url');
 
 const app = express();
-app.use(cors());
+
+// CORS 配置 - 允许所有来源（开发环境）
+// 生产环境建议限制特定域名
+app.use(cors({
+  origin: '*', // 开发环境允许所有来源
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
 app.use(express.json());
 app.use(express.static('build'));
+
+// 添加请求日志中间件
+app.use((req, res, next) => {
+  console.log(`📥 ${req.method} ${req.path}`, {
+    body: req.body,
+    query: req.query,
+    headers: req.headers.origin
+  });
+  next();
+});
 
 // 星火大模型配置 - 从环境变量读取
 // 注意：如果使用 HTTP 接口，需要修改 callSparkApi 函数
@@ -608,20 +627,46 @@ app.post('/api/chat', async (req, res) => {
         } else {
             console.log("💬 进入普通聊天模式");
             try {
+                // 构建更丰富的对话上下文，让AI能够更好地理解用户意图
+                const systemPrompt = `你是小忆，一个温暖、耐心、专业的AI康复助手。你的任务是：
+1. 根据用户的语音内容，自由、自然地回答用户的问题
+2. 用友好、亲切、温柔的语气与用户交流
+3. 如果用户询问康复相关的问题，提供专业建议
+4. 如果用户想要玩游戏或使用功能，引导用户
+5. 如果用户只是闲聊，也要友好地回应
+6. 回答要简洁自然，就像真正的朋友在对话一样
+7. 根据用户的语音内容灵活回答，不要机械地重复`;
+
                 const messagesToSend = [
                     {
                         role: "system",
-                        content: "你是小忆，一个温暖、耐心、专业的AI助手。请用友好亲切的语气与用户交流，提供有帮助的回答。"
+                        content: systemPrompt
                     },
-                    ...userHistory.slice(-4)
+                    ...userHistory.slice(-6) // 增加上下文历史，从4条增加到6条
                 ];
 
+                console.log(`📝 发送给AI的消息:`, {
+                    systemPrompt: systemPrompt.substring(0, 100) + '...',
+                    userHistory: userHistory.slice(-6).map(m => ({
+                        role: m.role,
+                        content: m.content.substring(0, 50) + (m.content.length > 50 ? '...' : '')
+                    }))
+                });
+
                 aiResponse = await callSparkApi(messagesToSend);
+                
+                // 确保回复不为空
+                if (!aiResponse || !aiResponse.trim()) {
+                    aiResponse = "我理解了，请继续说吧。";
+                }
+                
+                console.log(`✅ AI回复: ${aiResponse.substring(0, 100)}${aiResponse.length > 100 ? '...' : ''}`);
+                
                 mmseMode = false;
                 currentIndex = -1;
             } catch (e) {
                 console.log(`❌ 普通聊天出错: ${e}`);
-                aiResponse = "抱歉，我现在无法处理您的消息，请稍后重试。";
+                aiResponse = "抱歉，我刚才没有听清楚，请再说一遍好吗？";
                 mmseMode = false;
                 currentIndex = -1;
             }
@@ -660,6 +705,15 @@ app.post('/api/start-mmse', (req, res) => {
     try {
         const { sessionId = 'default' } = req.body;
         console.log(`🎯 开始MMSE评估，会话ID: ${sessionId}`);
+        console.log(`📋 请求详情:`, {
+            method: req.method,
+            path: req.path,
+            body: req.body,
+            headers: {
+                origin: req.headers.origin,
+                'content-type': req.headers['content-type']
+            }
+        });
 
         if (!userSessions[sessionId]) {
             userSessions[sessionId] = {
@@ -683,7 +737,7 @@ app.post('/api/start-mmse', (req, res) => {
         session.conversation.push({ role: "assistant", content: welcomeMessage });
         session.conversation.push({ role: "assistant", content: firstQuestion });
 
-        res.json({
+        const responseData = {
             success: true,
             data: {
                 first_question: firstQuestion,
@@ -692,13 +746,19 @@ app.post('/api/start-mmse', (req, res) => {
                 total_questions: mmseItems.length,
                 sessionId: sessionId
             }
-        });
+        };
+
+        console.log(`✅ MMSE评估启动成功，返回数据:`, responseData);
+        
+        res.json(responseData);
 
     } catch (e) {
-        console.log(`❌ 开始MMSE评估错误: ${e}`);
+        console.error(`❌ 开始MMSE评估错误:`, e);
+        console.error(`❌ 错误堆栈:`, e.stack);
         res.status(500).json({
             success: false,
-            error: `开始评估失败: ${e.message}`
+            error: `开始评估失败: ${e.message}`,
+            stack: process.env.NODE_ENV === 'development' ? e.stack : undefined
         });
     }
 });
