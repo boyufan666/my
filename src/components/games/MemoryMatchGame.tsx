@@ -196,7 +196,7 @@ export function MemoryMatchGame({ onScoreChange, onComplete }: MemoryMatchGamePr
     setCurrentQuestion(`这是什么${nextCard.category === 'animal' ? '动物' : nextCard.category === 'plant' ? '植物' : '物品'}？`);
     
     setIsSpeaking(true);
-    await speakText(`这是${nextCard.name}`, () => {}, { rate: 0.9, pitch: 1.1, volume: 0.9 });
+    await speakText(`这是${nextCard.name}`, () => {
       setIsSpeaking(false);
       
       setCards(prev => prev.map(card => 
@@ -249,7 +249,7 @@ export function MemoryMatchGame({ onScoreChange, onComplete }: MemoryMatchGamePr
           }
         );
       }, 1500); // 减少延迟从3000ms到1500ms
-    });
+    }, { rate: 0.9, pitch: 1.1, volume: 0.9 });
   };
 
   const checkAnswer = async (userAnswer: string, correctCard: Card) => {
