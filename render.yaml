@@ -1,0 +1,19 @@
+# Render 部署配置文件
+services:
+  - type: web
+    name: ai-rehab-platform
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      # 以下环境变量需要在 Render 控制台手动设置
+      # SPARK_APPID
+      # SPARK_API_SECRET
+      # SPARK_API_KEY
+      # SPARK_URL (可选)
+      # SPARK_DOMAIN (可选)
+
