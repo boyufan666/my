@@ -40,15 +40,18 @@ const SPARK_CONFIG = {
     DOMAIN: process.env.SPARK_DOMAIN || "generalv1.5"
 };
 
-// 检查配置是否完整
+// 检查配置是否完整（仅在运行时检查，构建时不退出）
+// 注意：在Render构建阶段，环境变量可能还未设置，所以这里只警告不退出
 if (!SPARK_CONFIG.APPID || !SPARK_CONFIG.API_SECRET || !SPARK_CONFIG.API_KEY) {
-    console.error("❌ 星火大模型配置缺失！请在环境变量中设置：");
-    console.error("   SPARK_APPID");
-    console.error("   SPARK_API_SECRET");
-    console.error("   SPARK_API_KEY");
-    console.error("   (可选) SPARK_URL");
-    console.error("   (可选) SPARK_DOMAIN");
-    process.exit(1);
+    console.warn("⚠️ 星火大模型配置缺失！请在环境变量中设置：");
+    console.warn("   SPARK_APPID");
+    console.warn("   SPARK_API_SECRET");
+    console.warn("   SPARK_API_KEY");
+    console.warn("   (可选) SPARK_URL");
+    console.warn("   (可选) SPARK_DOMAIN");
+    console.warn("⚠️ 注意：如果这是构建阶段，请忽略此警告。");
+    // 不在构建阶段退出，只在运行时检查
+    // process.exit(1); // 已注释，避免构建失败
 }
 
 // 存储用户对话历史和MMSE状态
@@ -791,6 +794,21 @@ function getLocalIP() {
 }
 
 const localIP = getLocalIP();
+
+// 在启动服务器前，再次检查环境变量（运行时检查）
+if (!SPARK_CONFIG.APPID || !SPARK_CONFIG.API_SECRET || !SPARK_CONFIG.API_KEY) {
+    console.error("=".repeat(60));
+    console.error("❌ 错误：星火大模型配置缺失！");
+    console.error("请在环境变量中设置以下变量：");
+    console.error("   SPARK_APPID");
+    console.error("   SPARK_API_SECRET");
+    console.error("   SPARK_API_KEY");
+    console.error("   (可选) SPARK_URL");
+    console.error("   (可选) SPARK_DOMAIN");
+    console.error("=".repeat(60));
+    console.error("⚠️ 服务器无法启动，请配置环境变量后重试。");
+    process.exit(1);
+}
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log("=".repeat(60));

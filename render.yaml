@@ -3,17 +3,19 @@ services:
   - type: web
     name: ai-rehab-platform
     env: node
+    # 构建命令：先安装依赖，再构建前端
     buildCommand: npm install && npm run build
+    # 启动命令：运行Node.js服务器
     startCommand: npm run start
+    # 环境变量配置
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 5000
-      # 以下环境变量需要在 Render 控制台手动设置
-      # SPARK_APPID
-      # SPARK_API_SECRET
-      # SPARK_API_KEY
-      # SPARK_URL (可选)
-      # SPARK_DOMAIN (可选)
+      # PORT 由 Render 自动分配，不需要手动设置
+      # 以下环境变量需要在 Render 控制台手动设置（Settings → Environment）
+      # SPARK_APPID - 星火大模型APPID（必需）
+      # SPARK_API_SECRET - 星火大模型API密钥（必需）
+      # SPARK_API_KEY - 星火大模型API Key（必需）
+      # SPARK_URL - 星火大模型WebSocket地址（可选，默认：wss://spark-api-qpe.n.xf-yun.com/v2.1/chat）
+      # SPARK_DOMAIN - 星火大模型域名（可选，默认：generalv1.5）
 
