@@ -65,8 +65,9 @@ app.listen(PORT, '0.0.0.0', () => {
 - `SPARK_API_KEY` - 星火大模型API Key
 
 **可选的环境变量**：
-- `SPARK_URL` - 星火大模型WebSocket地址（默认：`wss://spark-api-qpe.n.xf-yun.com/v2.1/chat`）
+- `SPARK_URL` - 星火大模型接口地址（默认：`https://spark-api-open.xf-yun.com/v2/chat/completions`）
 - `SPARK_DOMAIN` - 星火大模型域名（默认：`generalv1.5`）
+- `APIPassword` - API密码（可选）
 
 ### 2. 构建和部署配置
 

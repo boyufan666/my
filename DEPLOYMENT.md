@@ -62,17 +62,18 @@ git push -u origin main
 
 ```
 SPARK_APPID=81bc3993
-SPARK_API_SECRET=ZJ2yFzXGZYzjB30DE2QT0QNtADYViNI
-SPARK_API_KEY=a8dcd4da1723840efe19d07982f71534
-SPARK_URL=wss://spark-api-qpe.n.xf-yun.com/v2.1/chat
+SPARK_API_SECRET=ZjUyZjFkZGYzZjI3ODE2OTQ0NTA0YjNj
+SPARK_API_KEY=a8dcdd4a1723840efe19d07982f71534
+SPARK_URL=https://spark-api-open.xf-yun.com/v2/chat/completions
 SPARK_DOMAIN=generalv1.5
+APIPassword=IsXfLKYLJAdwcWsTelxV:iAFMupnCOCPZMhizojvf
 NODE_ENV=production
 PORT=5000
 ```
 
 **重要**：不要将密钥提交到 Git！只在 Render 控制台设置。
 
-**注意**：以上配置已针对 Spark X1.5 版本优化，WebSocket 地址已更新。
+**注意**：以上配置已针对 Spark X1.5 版本优化，使用 HTTP 接口调用。
 
 ### 4. 部署
 
@@ -98,10 +99,11 @@ PORT=5000
 
 ```bash
 SPARK_APPID=81bc3993
-SPARK_API_SECRET=ZJ2yFzXGZYzjB30DE2QT0QNtADYViNI
-SPARK_API_KEY=a8dcd4da1723840efe19d07982f71534
-SPARK_URL=wss://spark-api-qpe.n.xf-yun.com/v2.1/chat
+SPARK_API_SECRET=ZjUyZjFkZGYzZjI3ODE2OTQ0NTA0YjNj
+SPARK_API_KEY=a8dcdd4a1723840efe19d07982f71534
+SPARK_URL=https://spark-api-open.xf-yun.com/v2/chat/completions
 SPARK_DOMAIN=generalv1.5
+APIPassword=IsXfLKYLJAdwcWsTelxV:iAFMupnCOCPZMhizojvf
 ```
 
 **注意**：所有配置已填写好，可直接使用。

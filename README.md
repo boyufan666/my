@@ -42,11 +42,12 @@ npm install
 创建 `.env` 文件：
 
 ```env
-SPARK_APPID=你的APPID
-SPARK_API_SECRET=你的API_SECRET
-SPARK_API_KEY=你的API_KEY
-SPARK_URL=wss://spark-api.xf-yun.com/v3.5/chat
-SPARK_DOMAIN=generalv3.5
+SPARK_APPID=81bc3993
+SPARK_API_SECRET=ZjUyZjFkZGYzZjI3ODE2OTQ0NTA0YjNj
+SPARK_API_KEY=a8dcdd4a1723840efe19d07982f71534
+SPARK_URL=https://spark-api-open.xf-yun.com/v2/chat/completions
+SPARK_DOMAIN=generalv1.5
+APIPassword=IsXfLKYLJAdwcWsTelxV:iAFMupnCOCPZMhizojvf
 ```
 
 ### 开发模式

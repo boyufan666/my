@@ -6,10 +6,11 @@
 
 ```
 SPARK_APPID=81bc3993
-SPARK_API_SECRET=ZJ2yFzXGZYzjB30DE2QT0QNtADYViNI
-SPARK_API_KEY=a8dcd4da1723840efe19d07982f71534
-SPARK_URL=wss://spark-api-qpe.n.xf-yun.com/v2.1/chat
+SPARK_API_SECRET=ZjUyZjFkZGYzZjI3ODE2OTQ0NTA0YjNj
+SPARK_API_KEY=a8dcdd4a1723840efe19d07982f71534
+SPARK_URL=https://spark-api-open.xf-yun.com/v2/chat/completions
 SPARK_DOMAIN=generalv1.5
+APIPassword=IsXfLKYLJAdwcWsTelxV:iAFMupnCOCPZMhizojvf
 ```
 
 ## 可选变量
@@ -22,7 +23,8 @@ NODE_VERSION=20
 
 ## 说明
 
-- **SPARK_URL**: 使用 WebSocket 地址（X1.5版本）
+- **SPARK_URL**: 使用 HTTP 接口地址（v2版本）
 - **SPARK_DOMAIN**: 对应 Spark X1.5 的 Domain
+- **APIPassword**: API 密码（可选，用于某些认证场景）
 - 所有变量值已配置好，直接复制粘贴即可
 

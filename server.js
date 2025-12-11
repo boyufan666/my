@@ -3,6 +3,8 @@ const cors = require('cors');
 const path = require('path');
 const WebSocket = require('ws');
 const crypto = require('crypto');
+const https = require('https');
+const http = require('http');
 const { URL, URLSearchParams } = require('url');
 
 const app = express();
@@ -30,14 +32,14 @@ app.use((req, res, next) => {
 });
 
 // 星火大模型配置 - 从环境变量读取
-// 注意：如果使用 HTTP 接口，需要修改 callSparkApi 函数
-// X1.5 版本的 WebSocket 地址：wss://spark-api-qpe.n.xf-yun.com/v2.1/chat
+// 支持 WebSocket 和 HTTP 两种接口
 const SPARK_CONFIG = {
     APPID: process.env.SPARK_APPID,
     API_SECRET: process.env.SPARK_API_SECRET,
     API_KEY: process.env.SPARK_API_KEY,
-    SPARK_URL: process.env.SPARK_URL || "wss://spark-api-qpe.n.xf-yun.com/v2.1/chat",
-    DOMAIN: process.env.SPARK_DOMAIN || "generalv1.5"
+    SPARK_URL: process.env.SPARK_URL || "https://spark-api-open.xf-yun.com/v2/chat/completions",
+    DOMAIN: process.env.SPARK_DOMAIN || "generalv1.5",
+    API_PASSWORD: process.env.APIPassword || process.env.API_PASSWORD
 };
 
 // 检查配置是否完整（仅在运行时检查，构建时不退出）
@@ -359,78 +361,246 @@ class WsParam {
 function callSparkApi(messages) {
     return new Promise((resolve, reject) => {
         try {
-            const wsParam = new WsParam(
-                SPARK_CONFIG.APPID,
-                SPARK_CONFIG.API_KEY,
-                SPARK_CONFIG.API_SECRET,
-                SPARK_CONFIG.SPARK_URL
-            );
-
-            const wsUrl = wsParam.createUrl();
-            let response = '';
-
-            const ws = new WebSocket(wsUrl, {
-                rejectUnauthorized: false
-            });
-
-            ws.on('open', () => {
-                const data = JSON.stringify({
-                    header: { app_id: SPARK_CONFIG.APPID, uid: "1234" },
-                    parameter: {
-                        chat: {
-                            domain: SPARK_CONFIG.DOMAIN,
-                            temperature: 0.7,
-                            max_tokens: 2048,
-                            auditing: "default",
-                        }
-                    },
-                    payload: {
-                        message: { text: messages }
-                    }
-                });
-                ws.send(data);
-            });
-
-            ws.on('message', (data) => {
-                try {
-                    const message = JSON.parse(data);
-                    const code = message.header.code;
-                    
-                    if (code !== 0) {
-                        response = `API错误: ${code}`;
-                        ws.close();
-                        return;
-                    }
-
-                    const choices = message.payload.choices;
-                    const content = choices.text[0].content;
-                    const status = choices.status;
-
-                    response += content;
-
-                    if (status === 2) {
-                        console.log("AI回复完成");
-                        ws.close();
-                    }
-                } catch (e) {
-                    response = `处理错误: ${e.message}`;
-                    ws.close();
-                }
-            });
-
-            ws.on('error', (error) => {
-                response = `连接错误: ${error.message}`;
-                ws.close();
-            });
-
-            ws.on('close', () => {
-                resolve(response || "抱歉，没有收到回复");
-            });
-
+            const sparkUrl = SPARK_CONFIG.SPARK_URL;
+            
+            // 判断是 HTTP 还是 WebSocket 接口
+            if (sparkUrl.startsWith('https://') || sparkUrl.startsWith('http://')) {
+                // HTTP 接口调用
+                return callSparkApiHttp(messages, resolve, reject);
+            } else {
+                // WebSocket 接口调用（保持原有逻辑）
+                return callSparkApiWebSocket(messages, resolve, reject);
+            }
         } catch (e) {
             reject(`服务异常: ${e.message}`);
         }
     });
+}
+
+// HTTP 接口调用函数
+function callSparkApiHttp(messages, resolve, reject) {
+    try {
+        const url = new URL(SPARK_CONFIG.SPARK_URL);
+        const isHttps = url.protocol === 'https:';
+        const httpModule = isHttps ? https : http;
+        
+        // 转换消息格式为 HTTP 接口格式
+        let messagesArray = [];
+        if (Array.isArray(messages)) {
+            messagesArray = messages;
+        } else if (typeof messages === 'string') {
+            messagesArray = [{ role: 'user', content: messages }];
+        } else {
+            messagesArray = [];
+        }
+        
+        // 如果没有系统消息，添加默认系统消息
+        if (!messagesArray.find(m => m.role === 'system')) {
+            messagesArray.unshift({
+                role: 'system',
+                content: '你是小忆，一个温暖、耐心、专业的AI康复助手。'
+            });
+        }
+        
+        // 构建请求体 - 讯飞 HTTP 接口格式
+        const requestData = JSON.stringify({
+            header: {
+                app_id: SPARK_CONFIG.APPID,
+                uid: "1234"
+            },
+            parameter: {
+                chat: {
+                    domain: SPARK_CONFIG.DOMAIN,
+                    temperature: 0.7,
+                    max_tokens: 2048
+                }
+            },
+            payload: {
+                message: {
+                    text: messagesArray.map(m => ({
+                        role: m.role,
+                        content: m.content
+                    }))
+                }
+            }
+        });
+        
+        // 生成认证信息（讯飞 API 认证方式）
+        const now = new Date();
+        const date = now.toUTCString();
+        const signatureOrigin = `host: ${url.host}\ndate: ${date}\nPOST ${url.pathname} HTTP/1.1`;
+        const signatureSha = crypto.createHmac('sha256', SPARK_CONFIG.API_SECRET)
+            .update(signatureOrigin)
+            .digest('base64');
+        const authorizationOrigin = `api_key="${SPARK_CONFIG.API_KEY}", algorithm="hmac-sha256", headers="host date request-line", signature="${signatureSha}"`;
+        const authorization = Buffer.from(authorizationOrigin).toString('base64');
+        
+        const options = {
+            hostname: url.hostname,
+            port: url.port || (isHttps ? 443 : 80),
+            path: url.pathname,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': authorization,
+                'Date': date,
+                'Host': url.host
+            },
+            timeout: 30000 // 30秒超时
+        };
+        
+        const req = httpModule.request(options, (res) => {
+            let responseData = '';
+            
+            // 检查状态码
+            if (res.statusCode !== 200) {
+                res.on('data', () => {});
+                res.on('end', () => {
+                    reject(`HTTP错误: ${res.statusCode} ${res.statusMessage}`);
+                });
+                return;
+            }
+            
+            res.on('data', (chunk) => {
+                responseData += chunk.toString();
+            });
+            
+            res.on('end', () => {
+                try {
+                    if (!responseData) {
+                        reject('API返回空响应');
+                        return;
+                    }
+                    
+                    const result = JSON.parse(responseData);
+                    
+                    // 检查错误码
+                    if (result.header && result.header.code !== 0) {
+                        reject(`API错误: ${result.header.code} - ${result.header.message || result.header.sid || ''}`);
+                        return;
+                    }
+                    
+                    // 解析响应内容
+                    if (result.payload && result.payload.choices) {
+                        const choices = result.payload.choices;
+                        if (Array.isArray(choices.text) && choices.text.length > 0) {
+                            const content = choices.text[0].content;
+                            resolve(content || "抱歉，没有收到回复");
+                        } else if (choices.text && typeof choices.text === 'string') {
+                            resolve(choices.text || "抱歉，没有收到回复");
+                        } else {
+                            resolve("抱歉，没有收到回复");
+                        }
+                    } else if (result.content) {
+                        // 兼容其他可能的响应格式
+                        resolve(result.content || "抱歉，没有收到回复");
+                    } else {
+                        console.warn('未识别的响应格式:', result);
+                        resolve("抱歉，没有收到回复");
+                    }
+                } catch (e) {
+                    console.error('解析响应失败:', e, responseData);
+                    reject(`解析响应失败: ${e.message}`);
+                }
+            });
+        });
+        
+        req.on('error', (error) => {
+            reject(`HTTP请求错误: ${error.message}`);
+        });
+        
+        req.on('timeout', () => {
+            req.destroy();
+            reject('HTTP请求超时');
+        });
+        
+        req.write(requestData);
+        req.end();
+        
+    } catch (e) {
+        reject(`HTTP调用异常: ${e.message}`);
+    }
+}
+
+// WebSocket 接口调用函数（保持原有逻辑）
+function callSparkApiWebSocket(messages, resolve, reject) {
+    try {
+        const wsParam = new WsParam(
+            SPARK_CONFIG.APPID,
+            SPARK_CONFIG.API_KEY,
+            SPARK_CONFIG.API_SECRET,
+            SPARK_CONFIG.SPARK_URL
+        );
+
+        const wsUrl = wsParam.createUrl();
+        let response = '';
+
+        const ws = new WebSocket(wsUrl, {
+            rejectUnauthorized: false
+        });
+
+        ws.on('open', () => {
+            // 转换消息格式
+            const messageText = Array.isArray(messages) 
+                ? messages.map(m => `${m.role}: ${m.content}`).join('\n')
+                : messages;
+                
+            const data = JSON.stringify({
+                header: { app_id: SPARK_CONFIG.APPID, uid: "1234" },
+                parameter: {
+                    chat: {
+                        domain: SPARK_CONFIG.DOMAIN,
+                        temperature: 0.7,
+                        max_tokens: 2048,
+                        auditing: "default",
+                    }
+                },
+                payload: {
+                    message: { text: messageText }
+                }
+            });
+            ws.send(data);
+        });
+
+        ws.on('message', (data) => {
+            try {
+                const message = JSON.parse(data);
+                const code = message.header.code;
+                
+                if (code !== 0) {
+                    response = `API错误: ${code}`;
+                    ws.close();
+                    return;
+                }
+
+                const choices = message.payload.choices;
+                const content = choices.text[0].content;
+                const status = choices.status;
+
+                response += content;
+
+                if (status === 2) {
+                    console.log("AI回复完成");
+                    ws.close();
+                }
+            } catch (e) {
+                response = `处理错误: ${e.message}`;
+                ws.close();
+            }
+        });
+
+        ws.on('error', (error) => {
+            response = `连接错误: ${error.message}`;
+            ws.close();
+        });
+
+        ws.on('close', () => {
+            resolve(response || "抱歉，没有收到回复");
+        });
+
+    } catch (e) {
+        reject(`WebSocket调用异常: ${e.message}`);
+    }
 }
 
 function calculateMmseScore(answer, item) {
