@@ -321,6 +321,7 @@ export function MotionCaptureFrame({
   const handlePoseResult = useCallback((poseResult: PoseResult) => {
     // 检查姿态数据是否有效
     if (!poseResult || !poseResult.keypoints || poseResult.keypoints.length === 0) {
+      console.warn('⚠️ 姿态数据无效：缺少关键点');
       return;
     }
 
@@ -328,7 +329,36 @@ export function MotionCaptureFrame({
     const hasValidHands = (poseResult.leftWrist && poseResult.leftWrist.visibility && poseResult.leftWrist.visibility > 0.5) ||
                           (poseResult.rightWrist && poseResult.rightWrist.visibility && poseResult.rightWrist.visibility > 0.5);
 
-    // 传递完整的姿态结果给父组件
+    // 检查是否有有效的肩膀关键点（用于验证姿态检测是否正常工作）
+    const hasValidShoulders = (poseResult.leftShoulder && poseResult.leftShoulder.visibility && poseResult.leftShoulder.visibility > 0.5) ||
+                              (poseResult.rightShoulder && poseResult.rightShoulder.visibility && poseResult.rightShoulder.visibility > 0.5);
+
+    // 检查是否有有效的手肘关键点
+    const hasValidElbows = (poseResult.leftElbow && poseResult.leftElbow.visibility && poseResult.leftElbow.visibility > 0.5) ||
+                          (poseResult.rightElbow && poseResult.rightElbow.visibility && poseResult.rightElbow.visibility > 0.5);
+
+    // 记录检查结果（用于调试）
+    if (hasValidHands || hasValidShoulders || hasValidElbows) {
+      console.log('✅ 生物识别检查通过:', {
+        hasValidHands,
+        hasValidShoulders,
+        hasValidElbows,
+        leftWrist: poseResult.leftWrist ? {
+          x: poseResult.leftWrist.x,
+          y: poseResult.leftWrist.y,
+          visibility: poseResult.leftWrist.visibility
+        } : null,
+        rightWrist: poseResult.rightWrist ? {
+          x: poseResult.rightWrist.x,
+          y: poseResult.rightWrist.y,
+          visibility: poseResult.rightWrist.visibility
+        } : null
+      });
+    } else {
+      console.warn('⚠️ 生物识别检查：未检测到有效关键点');
+    }
+
+    // 传递完整的姿态结果给父组件（无论检查结果如何，都传递数据）
     if (onPoseResult) {
       onPoseResult(poseResult);
     }
@@ -543,6 +573,15 @@ export function MotionCaptureFrame({
           />
           识别中
         </motion.div>
+      )}
+
+      {/* 生物识别检查状态指示 */}
+      {isActive && (
+        <div className="absolute top-2 left-2 bg-blue-500/90 text-white text-xs px-2 py-1 rounded-lg z-20 shadow-lg">
+          <div className="flex items-center gap-1">
+            <span className="text-[10px]">🔍 检查中</span>
+          </div>
+        </div>
       )}
     </div>
   );
